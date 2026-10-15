@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, TouchableOpacity, ScrollView } from 'react-native';
+import { Text, TouchableOpacity, ScrollView, ActivityIndicator, View } from 'react-native';
 import { useGameContext } from '../../context/GameContext';
 import { PlayerForm } from '../../components/PlayerForm';
 import { ModeSelector } from '../../components/ModeSelector';
@@ -7,14 +7,31 @@ import { Leaderboard } from '../../components/Leaderboard';
 import styles from './HomeScreen.styles';
 
 export const HomeScreen: React.FC = () => {
-  const { playerName, startGame, countries } = useGameContext();
+  const { playerName, startGame, countries, isLoading, error, reloadCountries } = useGameContext();
 
-  const isReady = playerName.trim().length > 0 && countries.length > 0;
+  const isReady = playerName.trim().length > 0 && countries.length > 0 && !isLoading;
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>🌍 Flag & Capital Quiz</Text>
       <Text style={styles.subtitle}>¡Adivina y suma puntos en el ranking!</Text>
+
+      {isLoading ? (
+        <View style={{ marginVertical: 20, alignItems: 'center' }}>
+          <ActivityIndicator size="large" color="#007AFF" />
+          <Text style={{ marginTop: 10, color: '#666' }}>Cargando datos de países...</Text>
+        </View>
+      ) : error ? (
+        <View style={{ marginVertical: 15, alignItems: 'center' }}>
+          <Text style={{ color: 'red', marginBottom: 10 }}>{error}</Text>
+          <TouchableOpacity
+            style={{ backgroundColor: '#007AFF', padding: 10, borderRadius: 8 }}
+            onPress={reloadCountries}
+          >
+            <Text style={{ color: '#fff', fontWeight: 'bold' }}>Reintentar</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
 
       <PlayerForm />
       <ModeSelector />
@@ -25,7 +42,7 @@ export const HomeScreen: React.FC = () => {
         onPress={startGame}
       >
         <Text style={styles.startButtonText}>
-          {countries.length === 0 ? 'Cargando datos...' : '¡Jugar Ahora!'}
+          {isLoading ? 'Cargando datos...' : '¡Jugar Ahora!'}
         </Text>
       </TouchableOpacity>
 

@@ -14,6 +14,8 @@ interface GameContextType {
   gameMode: GameMode;
   timeLeft: number;
   isPlaying: boolean;
+  isLoading: boolean;
+  error: string | null;
   capitalOptions: string[];
   disabledOptions: string[];
   revealedLettersCount: number;
@@ -27,6 +29,7 @@ interface GameContextType {
   guessCapital: (selectedCapital: string) => boolean;
   requestHint: () => void;
   resetScore: () => void;
+  reloadCountries: () => void;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
@@ -39,21 +42,35 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [gameMode, setGameMode] = useState<GameMode>('flag');
   const [timeLeft, setTimeLeft] = useState<number>(INITIAL_TIMER);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [capitalOptions, setCapitalOptions] = useState<string[]>([]);
   const [disabledOptions, setDisabledOptions] = useState<string[]>([]);
   const [revealedLettersCount, setRevealedLettersCount] = useState<number>(0);
   const [leaderboard, setLeaderboard] = useState<PlayerScore[]>([]);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
-  // Carga inicial de datos y leaderboard almacenado
-  useEffect(() => {
-    const initData = async () => {
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
       const data = await fetchCountriesWithCapitals();
-      setCountries(data);
-      loadLeaderboard();
-    };
-    initData();
+      if (data.length === 0) {
+        setError('No se pudieron obtener datos de países.');
+      } else {
+        setCountries(data);
+      }
+    } catch (err) {
+      setError('Error al cargar datos del juego.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadData();
+    loadLeaderboard();
+  }, [loadData]);
 
   const loadLeaderboard = async () => {
     try {
@@ -82,7 +99,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Generar 3 opciones para el modo capitales
   const generateCapitalOptions = useCallback((targetCountry: Country, allCountries: Country[]) => {
     const wrongCapitals = allCountries
       .filter((c) => c.name !== targetCountry.name && c.capital)
@@ -94,7 +110,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setDisabledOptions([]);
   }, []);
 
-  // Seleccionar un nuevo país al azar
   const nextCountry = useCallback((countryList = countries) => {
     if (countryList.length === 0) return;
     const randomIndex = Math.floor(Math.random() * countryList.length);
@@ -126,7 +141,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     nextCountry();
   };
 
-  // Timer regresivo
   useEffect(() => {
     if (!isPlaying || !currentCountry) return;
 
@@ -146,7 +160,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return () => clearInterval(interval);
   }, [isPlaying, currentCountry, nextCountry]);
 
-  // Adivinar Bandera
   const guessFlag = (guess: string): boolean => {
     if (!currentCountry) return false;
     const isCorrect = guess.trim().toLowerCase() === currentCountry.name.toLowerCase();
@@ -166,7 +179,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Adivinar Capital
   const guessCapital = (selectedCapital: string): boolean => {
     if (!currentCountry) return false;
     const isCorrect = selectedCapital === currentCountry.capital;
@@ -186,7 +198,6 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  // Pistas: Descuenta 2s de timer
   const requestHint = () => {
     if (timeLeft <= 2) return;
     setTimeLeft((prev) => Math.max(1, prev - 2));
@@ -217,6 +228,8 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         gameMode,
         timeLeft,
         isPlaying,
+        isLoading,
+        error,
         capitalOptions,
         disabledOptions,
         revealedLettersCount,
@@ -230,6 +243,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         guessCapital,
         requestHint,
         resetScore,
+        reloadCountries: loadData,
       }}
     >
       {children}
